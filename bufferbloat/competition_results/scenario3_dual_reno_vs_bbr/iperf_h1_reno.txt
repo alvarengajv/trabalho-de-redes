@@ -1,0 +1,51 @@
+------------------------------------------------------------
+Client connecting to 10.0.0.4, TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[  5] local 10.0.0.1 port 34688 connected with 10.0.0.4 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  5]  0.0- 5.0 sec  7.82 MBytes  13.1 Mbits/sec
+[  5]  5.0-10.0 sec   573 KBytes   938 Kbits/sec
+[  5] 10.0-15.0 sec   255 KBytes   417 Kbits/sec
+[  5] 15.0-20.0 sec   445 KBytes   730 Kbits/sec
+[  5] 20.0-25.0 sec   700 KBytes  1.15 Mbits/sec
+[  5] 25.0-30.0 sec  1.12 MBytes  1.88 Mbits/sec
+[  5] 30.0-35.0 sec  1.43 MBytes  2.40 Mbits/sec
+[  5] 35.0-40.0 sec  1.74 MBytes  2.92 Mbits/sec
+[  5] 40.0-45.0 sec  1.62 MBytes  2.71 Mbits/sec
+[  5] 45.0-50.0 sec  1.30 MBytes  2.19 Mbits/sec
+[  5] 50.0-55.0 sec  1.49 MBytes  2.50 Mbits/sec
+[  5] 55.0-60.0 sec   827 KBytes  1.36 Mbits/sec
+[  5] 60.0-65.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 65.0-70.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 70.0-75.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 75.0-80.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 80.0-85.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 85.0-90.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 90.0-95.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 95.0-100.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 100.0-105.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 105.0-110.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 110.0-115.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 115.0-120.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 120.0-125.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 125.0-130.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 130.0-135.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 135.0-140.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 140.0-145.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 145.0-150.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 150.0-155.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 155.0-160.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 160.0-165.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 165.0-170.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 170.0-175.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 175.0-180.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 180.0-185.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 185.0-190.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 190.0-195.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 195.0-200.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 200.0-205.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 205.0-210.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 210.0-215.0 sec  0.00 Bytes  0.00 bits/sec
+[  5] 215.0-220.0 sec  0.00 Bytes  0.00 bits/sec
+[  5]  0.0-223.9 sec  19.3 MBytes   721 Kbits/sec
