@@ -1,5 +1,5 @@
 from mininet.topo import Topo
-from mininet.node import CPULimitedHost
+from mininet.node import CPULimitedHost, Controller
 from mininet.link import TCLink
 from mininet.net import Mininet
 from mininet.log import lg, info
@@ -61,19 +61,20 @@ parser.add_argument('--competition',
 
 parser.add_argument('--scenario',
                     type=str,
-                    choices=['reno_vs_bbr', 'dual_reno_vs_dual_bbr', 'dual_reno_vs_bbr'],
+                    choices=['reno_vs_bbr', 'dual_reno_vs_dual_bbr', 'dual_reno_vs_bbr', 'reno_vs_cubic'],
                     default='reno_vs_bbr',
                     help="""Competition scenario to run:
                     - reno_vs_bbr: 1 Reno vs 1 BBR
                     - dual_reno_vs_dual_bbr: 2 Reno vs 2 BBR  
-                    - dual_reno_vs_bbr: 2 Reno vs 1 BBR""")
+                    - dual_reno_vs_bbr: 2 Reno vs 1 BBR
+                    - reno_vs_cubic: 1 Reno vs 1 Cubic""")
 
 # Parâmetros do experimento
 args = parser.parse_args()
 
 
-class BBTopo(Topo):
-    "Topologia para experimentos de bufferbloat e competição TCP."
+class CompTopo(Topo):
+    "Topologia para experimentos de competição TCP."
 
     def build(self, n=4):
         # Criação de hosts baseada no cenário de competição
@@ -83,30 +84,26 @@ class BBTopo(Topo):
             for i in range(1, n+1):
                 host = self.addHost(f'h{i}')
                 hosts.append(host)
-        else:
-            # Cenário original: apenas 2 hosts
-            h1 = self.addHost('h1')
-            h2 = self.addHost('h2')
-            hosts = [h1, h2]
 
-        # Criação do switch central s0
+        # Criação do switch s0 para clientes, e s1 para o server
         # As interfaces serão s0-eth1, s0-eth2, s0-eth3, s0-eth4, etc.
-        switch = self.addSwitch('s0')
+        switch_cliente = self.addSwitch('s0')
+        switch_server = self.addSwitch('s1')
+
+        delay_ms = f"{args.delay}ms"
 
         # Configuração dos links com características específicas:
         if args.competition:
-            # Para competição: múltiplos clientes conectados ao switch
-            # e um servidor compartilhado (último host) 
+            # Múltiplos clientes conectados ao switch s0
             for i, host in enumerate(hosts[:-1], 1):
                 # Clientes: alta largura de banda (sem gargalo)
-                self.addLink(host, switch, bw=args.bw_host, delay=args.delay)
+                self.addLink(host, switch_cliente, bw=args.bw_host, delay=delay_ms)
             
-            # Servidor: link gargalo 
-            self.addLink(hosts[-1], switch, bw=args.bw_net, delay=args.delay, max_queue_size=args.maxq)
-        else:
-            # Configuração original
-            self.addLink(hosts[0], switch, bw=args.bw_host, delay=args.delay)
-            self.addLink(switch, hosts[1], bw=args.bw_net, delay=args.delay, max_queue_size=args.maxq)
+            # Link entre o servidor e o switch s1  
+            self.addLink(hosts[-1], switch_server, bw=args.bw_host, delay=delay_ms)
+
+            # Link entre os dois switchs, é o gargalo
+            self.addLink(switch_cliente, switch_server, bw=args.bw_net, delay=delay_ms, max_queue_size=args.maxq)
 
 
 def start_iperf_competition(net):
@@ -127,6 +124,10 @@ def start_iperf_competition(net):
         # Cenário 3: 2 fluxos Reno vs 1 fluxo BBR (competição desbalanceada)
         flows = [('h1', 'reno'), ('h2', 'reno'), ('h3', 'bbr')]
         server_host = 'h4'
+    elif args.scenario == 'reno_vs_cubic':
+        # Cenário 4: 1 fluxo Reno vs 1 fluxo Cubic
+        flows = [('h1', 'reno'), ('h2', 'Cubic')]
+        server_host = 'h3'
     
     # Inicia servidor iperf no host de destino
     server = net.get(server_host)
@@ -146,27 +147,13 @@ def start_iperf_competition(net):
         # Inicia iperf client com porta específica e logging
         port = 5001
         log_file = f"{args.dir}/iperf_{host_name}_{tcp_algo}.txt"
-        client_proc = client.popen(f"iperf -c {server.IP()} -p {port} --time {args.time} -i 1 > {log_file}", shell=True)
+        client_proc = client.popen(f"iperf -c {server.IP()} -p {port} --time {2*args.time} -i 5 > {log_file}", shell=True)
         clients.append((host_name, tcp_algo, client_proc))
         
         # Pequeno delay entre inícios para evitar sincronização
         sleep(0.5)
     
     return server_proc, clients
-
-
-def start_iperf(net):
-    """Função original para experimentos sem competição"""
-    h1 = net.get('h1')
-    h2 = net.get('h2')
-    print("Iniciando servidor iperf...")
-    # Parâmetro -w 16m garante que o fluxo TCP não seja limitado pela janela do receptor
-    # Isso assegura que o buffer do roteador seja preenchido durante o teste
-    server = h2.popen("iperf -s -w 16m")
-
-    # Inicia cliente iperf em h1 conectando ao servidor h2
-    # Fluxo TCP de longa duração (2x o tempo do experimento) para saturar o link
-    client = h1.popen('iperf -c ' + str(h2.IP()) + ' --time ' + str(2*args.time))
 
 
 def start_qmon(iface, interval_sec=0.1, outfile="buffer.txt"):
@@ -185,26 +172,6 @@ def start_ping(net):
     h1.popen("ping -i 0.1 " + str(h2.IP()) + " > " + args.dir + "/ping.txt", shell=True)
 
 
-def start_webserver(net):
-    h1 = net.get('h1')
-    proc = h1.popen("python http/webserver.py", shell=True)
-    sleep(1)
-    return [proc]
-
-
-def fetch_pages(net):
-    h2 = net.get('h2')
-    h1 = net.get('h1')
-    result = 0
-    for i in range(3):
-        # Executa curl para medir tempo de download da página web
-        proc = h2.popen("curl -o /dev/null -s -w %{time_total} " + str(h1.IP()) + "/http/index.html", shell=True, text=True, stdout=PIPE)
-        output = proc.stdout.readline()
-        print(output)
-        result += float(output)
-    return result
-
-
 def bufferbloat():
     if not os.path.exists(args.dir):
         os.makedirs(args.dir)
@@ -218,15 +185,11 @@ def bufferbloat():
             # 2 Reno + 1 BBR + 1 servidor = 4 hosts
             num_hosts = 4
         else:
-            # Para reno_vs_bbr: 3 hosts (2 clientes + 1 servidor)
+            # Para reno_vs_bbr e reno_vs_cubic: 3 hosts (2 clientes + 1 servidor)
             num_hosts = 3
-        topo = BBTopo(n=num_hosts)
-    else:
-        # Cenário original com 2 hosts
-        os.system("sysctl -w net.ipv4.tcp_congestion_control=%s" % args.cong)
-        topo = BBTopo(n=2)
+        topo = CompTopo(n=num_hosts)
     
-    net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
+    net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink, controller=Controller)
     net.start()
     
     # Exibe a topologia e como os nós estão interconectados
@@ -237,14 +200,7 @@ def bufferbloat():
     # Inicia monitoramento do tamanho da fila do switch
     # Para competição, monitora a interface do servidor (última interface)
     if args.competition:
-        if args.scenario == 'dual_reno_vs_dual_bbr':
-            interface = 's0-eth5'  # Interface do servidor (h5)
-        elif args.scenario == 'dual_reno_vs_bbr':
-            interface = 's0-eth4'  # Interface do servidor (h4)
-        else:
-            interface = 's0-eth3'  # Interface do servidor (h3)
-    else:
-        interface = 's0-eth2'  # Interface original (h2)
+        interface = 's1-eth2'  # Interface do servidor (h5)
     
     qmon = start_qmon(iface=interface, outfile='%s/buffer.txt' % (args.dir))
 
@@ -278,30 +234,6 @@ def bufferbloat():
                 client_proc.terminate()
             except:
                 pass
-                
-    else:
-        # Modo original: experimento de bufferbloat
-        start_iperf(net)
-        start_ping(net)
-        start_webserver(net)
-
-        # Medição do tempo de transferência de páginas web
-        times = []
-        start_time = time()
-        while True:
-            times.append(fetch_pages(net))
-            sleep(5)
-            now = time()
-            delta = now - start_time
-            if delta > args.time:
-                break
-            print("%.1fs restantes..." % (args.time - delta))
-
-        # Cálculo de estatísticas dos tempos de busca das páginas web
-        tempo_medio_busca = sum(times) / len(times)
-        print("Tempo médio de busca da página web quando q = " + str(args.maxq) + ": " + str(tempo_medio_busca))
-        desvio_padrao = (sum([((x - tempo_medio_busca) ** 2) for x in times]) / len(times)) ** 0.5
-        print("Desvio padrão quando q = " + str(args.maxq) + ": " + str(desvio_padrao))
 
     # CLI desabilitada para execução automática
     # CLI(net)
@@ -316,7 +248,6 @@ def bufferbloat():
 
 def analyze_tcp_competition():
     """Analisa os resultados da competição TCP e determina o 'vencedor'"""
-    print("\n=== ANÁLISE DA COMPETIÇÃO TCP ===")
     
     import glob
     import re
@@ -386,36 +317,11 @@ def analyze_tcp_competition():
         sorted_results = sorted(results.items(), key=lambda x: x[1]['throughput_mbps'], reverse=True)
         winner = sorted_results[0]
         
-        print(f"\n🏆 VENCEDOR: {winner[1]['host']} com TCP {winner[1]['tcp_algo']}")
-        print(f"   Vazão: {winner[1]['throughput_mbps']:.2f} Mbits/sec")
-        
         # Análise de fairness (justiça)
         throughputs = [data['throughput_mbps'] for data in results.values()]
         fairness_index = calculate_fairness_index(throughputs)
         print(f"\nÍndice de Justiça (Jain's Fairness Index): {fairness_index:.3f}")
         print("(1.0 = perfeitamente justo, menor = mais injusto)")
-        
-        # Interpretação dos resultados
-        print("\n📊 INTERPRETAÇÃO:")
-        reno_flows = [data for data in results.values() if data['tcp_algo'] == 'RENO']
-        bbr_flows = [data for data in results.values() if data['tcp_algo'] == 'BBR']
-        
-        if reno_flows and bbr_flows:
-            avg_reno = sum(f['throughput_mbps'] for f in reno_flows) / len(reno_flows)
-            avg_bbr = sum(f['throughput_mbps'] for f in bbr_flows) / len(bbr_flows)
-            
-            print(f"Vazão média TCP Reno: {avg_reno:.2f} Mbits/sec")
-            print(f"Vazão média TCP BBR: {avg_bbr:.2f} Mbits/sec")
-            
-            if avg_bbr > avg_reno * 1.1:
-                print("→ TCP BBR demonstra superioridade neste cenário")
-                print("  BBR é mais eficiente em detectar largura de banda disponível")
-            elif avg_reno > avg_bbr * 1.1:
-                print("→ TCP Reno demonstra melhor performance neste cenário")
-                print("  Reno pode ser mais agressivo em redes com baixo RTT")
-            else:
-                print("→ Desempenho similar entre TCP Reno e BBR")
-                print("  Ambos os algoritmos se adaptaram bem às condições da rede")
 
 
 def calculate_fairness_index(throughputs):
